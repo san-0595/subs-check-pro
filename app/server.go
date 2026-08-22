@@ -465,6 +465,11 @@ func (app *App) getStatus(c *gin.Context) {
 		"isSubStoreRunning": assets.IsSubStoreRunning.Load(),
 		"subStoreSyncing":   subStoreSyncing.Load(),  // 将后台更新状态暴露给前端
 		"eta":               check.ETASeconds.Load(), // -1=计算中, 0=完成, >0=剩余秒
+
+		"subStorePort":  config.GlobalConfig.SubStorePort,
+		"subStorePath":  config.GlobalConfig.SubStorePath,
+		"singboxOld":    utils.OldSingboxVersion,
+		"singboxLatest": utils.LatestSingboxVersion,
 	})
 }
 
