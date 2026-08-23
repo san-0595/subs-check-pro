@@ -207,8 +207,8 @@ singbox-latest:
   json: "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.14.x/sing-box.json"
   js: "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.14.x/sing-box.js"
 
-# ⚠️ 即将废弃：singbox-old iOS 旧版 1.11 兼容配置
-# sing-box MT 于 2026-08-31 上架 App Store 后将逐步移除
+# singbox-old iOS 支持同时生成旧版 singbox 配置
+# ⚠️ sing-box MT 于 2026-08-31 上架 App Store 后，iOS 用户可使用最新 singbox 版本，将逐步移除该项配置
 singbox-old:
   version: 1.11
   json: "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.11.x/sing-box.json"
