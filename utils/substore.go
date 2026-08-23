@@ -4,7 +4,6 @@ package utils
 import (
 	"bytes"
 	"fmt"
-	"github.com/goccy/go-json"
 	"io"
 	"log/slog"
 	"net/http"
@@ -14,6 +13,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/goccy/go-json"
 
 	"github.com/sinspired/subs-check-pro/v2/config"
 )
@@ -83,10 +84,13 @@ const (
 	// 差量合并时：有此前缀 → 按类型决策；无此前缀 → 用户操作，原样保留。
 	scpIDPrefix = "SCP."
 
-	latestSingboxJSON = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.12.x/sing-box.json"
-	latestSingboxJS   = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.12.x/sing-box.js"
-	OldSingboxJSON    = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.11.x/sing-box.json"
-	OldSingboxJS      = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.11.x/sing-box.js"
+	latestSingboxJSON = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.14.x/sing-box.json"
+	latestSingboxJS   = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.14.x/sing-box.js"
+
+	// Deprecated: sing-box MT 于 2026-08-31 上架 App Store 后将逐步移除
+	OldSingboxJSON = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.11.x/sing-box.json"
+	// Deprecated: sing-box MT 于 2026-08-31 上架 App Store 后将逐步移除
+	OldSingboxJS = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.11.x/sing-box.js"
 
 	// nodeSplitScript 将 DNS 解析得到的多 IP 展开为独立节点
 	nodeSplitScript = `// 节点裂变脚本
@@ -141,11 +145,13 @@ func InitSingboxVersion() {
 	if config.GlobalConfig.SingboxLatest.Version != "" && config.GlobalConfig.SingboxLatest.JSON != "" && config.GlobalConfig.SingboxLatest.JS != "" {
 		LatestSingboxVersion = config.GlobalConfig.SingboxLatest.Version
 	} else {
-		LatestSingboxVersion = "1.12"
+		LatestSingboxVersion = "1.14"
 	}
 	if config.GlobalConfig.SingboxOld.Version != "" && config.GlobalConfig.SingboxOld.JSON != "" && config.GlobalConfig.SingboxOld.JS != "" {
-		OldSingboxVersion = config.GlobalConfig.SingboxOld.Version
+		// Deprecated: sing-box MT 于 2026-08-31 上架 App Store 后将逐步移除
+		OldSingboxVersion = config.GlobalConfig.SingboxOld.Version //nolint:staticcheck // SingboxOld is intentionally retained for iOS compatibility.
 	} else {
+		// Deprecated: sing-box MT 于 2026-08-31 上架 App Store 后将逐步移除
 		OldSingboxVersion = "1.11"
 	}
 }
