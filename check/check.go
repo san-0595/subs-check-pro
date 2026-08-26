@@ -1236,7 +1236,16 @@ type ProxyClient struct {
 }
 
 // CreateClient 创建独立的代理客户端
-func CreateClient(mapping map[string]any) *ProxyClient {
+func CreateClient(mapping map[string]any) (client *ProxyClient) {
+	// 捕获 panic，防止由于底层库解析畸形节点导致整个程序崩溃
+	defer func() {
+		if r := recover(); r != nil {
+			name, _ := mapping["name"].(string)
+			slog.Debug("底层mihomo创建代理Client时发生Panic，已自动丢弃该畸形节点", "name", name, "panic", r)
+			client = nil // 发生panic时，向外层返回 nil
+		}
+	}()
+
 	pc := &ProxyClient{}
 
 	var err error

@@ -7,19 +7,20 @@ import (
 	"strings"
 )
 
-// NormalizeNode 统一清洗节点字段
+// NormalizeNode 统一清洗节点字段并验证节点合法性
 // 将各种非标准或类型不确定的字段转换为 Clash/Mihomo 标准格式
-func NormalizeNode(m map[string]any) {
+// 返回 bool 表示该节点是否为有效节点（有效返回 true，无效应当丢弃）
+func NormalizeNode(m map[string]any) bool {
 	if m == nil {
-		return
+		return false
 	}
 
-	// 不一定需要转换
+	// 1. 端口转换
 	if p, ok := m["port"]; ok {
 		m["port"] = ToIntPort(p)
 	}
 
-	// Mihomo decoder 在处理非 bool 类型的布尔字段时可能 panic
+	// 2. Mihomo decoder 在处理非 bool 类型的布尔字段时可能 panic
 	for _, field := range []string{
 		"tls", "udp", "skip-cert-verify", "tfo",
 		"allow-insecure", "xudp", "reuse-addr", "disable-sni",
@@ -35,7 +36,7 @@ func NormalizeNode(m map[string]any) {
 	// 3. 协议类型：统一小写
 	tObj, hasType := m["type"]
 	if !hasType {
-		return
+		return false // 连 type 都没有的节点绝对是无效的
 	}
 	t := strings.ToLower(fmt.Sprintf("%v", tObj))
 	m["type"] = t
@@ -46,6 +47,7 @@ func NormalizeNode(m map[string]any) {
 		// Mihomo 不认识 "https" type，转换为标准写法
 		m["type"] = "http"
 		m["tls"] = true
+		t = "http" // 同步更新 t，方便后面的终极校验
 	case "trojan":
 		// 来源数据经常漏 tls 字段，Trojan 协议本身强依赖 TLS
 		if _, hasTLS := m["tls"]; !hasTLS {
@@ -74,7 +76,6 @@ func NormalizeNode(m map[string]any) {
 				xhttpOpts["path"] = "/"
 			}
 			m["xhttp-opts"] = xhttpOpts
-			// delete(m, "path") // FIXME: 验证是否应清理
 		}
 
 	case "hysteria2", "hy2":
@@ -83,10 +84,38 @@ func NormalizeNode(m map[string]any) {
 			m["obfs-password"] = val
 			delete(m, "obfs_password")
 		}
+
+	// WireGuard 致命参数拦截
+	case "wireguard", "wg":
+		pk, _ := m["private-key"].(string)
+		pubk, _ := m["public-key"].(string)
+
+		if pk == "" || pubk == "" {
+			m["type"] = "invalid"
+			t = "invalid"
+			slog.Debug("发现缺失公钥或私钥的畸形 WireGuard 节点，已拦截", "name", m["name"])
+		}
 	}
 
 	// WS 扁平字段整合：ws-path / ws-headers → ws-opts
 	normalizeWsFields(m)
+
+	// 5. 终极有效性校验
+	if t == "" || t == "invalid" {
+		return false
+	}
+	
+	server := strings.TrimSpace(fmt.Sprintf("%v", m["server"]))
+	port := ToIntPort(m["port"])
+	
+	// 豁免本地和特殊策略类型（direct, reject, dns 等）
+	if t != "direct" && t != "reject" && t != "dns" {
+		if server == "" || server == "<nil>" || port <= 0 || port > 65535 {
+			return false
+		}
+	}
+
+	return true
 }
 
 func normalizeWsFields(m map[string]any) {

@@ -252,8 +252,9 @@ func ConvertSingBoxOutbounds(outbounds []any) []map[string]any {
 			}
 		}
 
-		NormalizeNode(conv)
-		res = append(res, conv)
+		if NormalizeNode(conv) {
+			res = append(res, conv)
+		}
 	}
 	return res
 }
@@ -318,7 +319,7 @@ func ConvertProtocolMap(con map[string]any) []map[string]any {
 // ParseProxyLinksAndConvert 统一处理链接列表
 // 能够同时处理 WireGuard, SSR (手动解析) 和 V2Ray/Clash 支持的标准协议 (调用 Mihomo)
 // subURL 用于在猜测协议时提供上下文 (例如文件名包含 socks5)
-// 
+//
 // 返回值：(去重后的节点列表, 批次级别去重掉的节点数量)
 func ParseProxyLinksAndConvert(links []string, subURL string) ([]map[string]any, int) {
 	var finalNodes []map[string]any
@@ -482,7 +483,11 @@ func ParseWireGuardURI(link string) map[string]any {
 		node["mtu"] = ToIntPort(mtu)
 	}
 	if addr := q.Get("address"); addr != "" {
-		node["ip"] = strings.Split(addr, "/")[0]
+		// Mihomo 依赖标准的 CIDR 格式
+		if !strings.Contains(addr, "/") {
+			addr += "/32" // 如果订阅没有提供掩码，主动补充默认掩码
+		}
+		node["ip"] = addr
 	}
 
 	if res := q.Get("reserved"); res != "" {
@@ -572,8 +577,10 @@ func ConvertGeneralJSONArray(list []any) []map[string]any {
 			if name, ok := m["remarks"].(string); ok && name != "" && node["name"] == nil {
 				node["name"] = name
 			}
-			NormalizeNode(node)
-			nodes = append(nodes, node)
+			if NormalizeNode(node) {
+				nodes = append(nodes, node)
+			}
+
 			continue
 		}
 
@@ -605,8 +612,9 @@ func ConvertGeneralJSONArray(list []any) []map[string]any {
 					node["name"] = fmt.Sprintf("ss-%v:%d", m["server"], ToIntPort(m["server_port"]))
 				}
 
-				NormalizeNode(node)
-				nodes = append(nodes, node)
+				if NormalizeNode(node) {
+					nodes = append(nodes, node)
+				}
 			}
 		}
 	}
@@ -643,9 +651,9 @@ func ExtractAndParseProxies(data []byte) []map[string]any {
 		// 尝试解析 YAML
 		if err := yaml.Unmarshal(buffer.Bytes(), &c); err == nil {
 			for _, p := range c.Proxies {
-				NormalizeNode(p)
-				nodes = append(nodes, p)
-
+				if NormalizeNode(p) {
+					nodes = append(nodes, p)
+				}
 			}
 		}
 		buffer.Reset()
@@ -746,10 +754,11 @@ func ParseYamlFlowList(data []byte) []map[string]any {
 		// 执行昂贵的 Unmarshal
 		if err := yaml.Unmarshal([]byte(yamlLine), &tempNodes); err == nil && len(tempNodes) > 0 {
 			for _, m := range tempNodes {
-				NormalizeNode(m)
-				// 解析后再次校验关键字段，确保数据的完整性
-				if _, hasServer := m["server"]; hasServer {
-					nodes = append(nodes, m)
+				if NormalizeNode(m) {
+					// 解析后再次校验关键字段，确保数据的完整性
+					if _, hasServer := m["server"]; hasServer {
+						nodes = append(nodes, m)
+					}
 				}
 			}
 		}
@@ -931,8 +940,9 @@ func ParseV2RayJSONLines(data []byte) []map[string]any {
 			}
 		}
 
-		NormalizeNode(node)
-		nodes = append(nodes, node)
+		if NormalizeNode(node) {
+			nodes = append(nodes, node)
+		}
 	}
 	return nodes
 }
@@ -1049,23 +1059,26 @@ func ParseBracketKVProxies(data []byte) []map[string]any {
 			}
 		}
 
-		NormalizeNode(node)
-		nodes = append(nodes, node)
+		if NormalizeNode(node) {
+			nodes = append(nodes, node)
+		}
 	}
 	return nodes
 }
 
-// ToNormalizeNodes 将 Mihomo 的转换结果进行标准化输出
+// ToNormalizeNodes 将 Mihomo 的转换结果进行标准化输出，并过滤掉无效节点
 func ToNormalizeNodes(list []map[string]any) []map[string]any {
 	if list == nil {
 		return nil
 	}
-	for i, v := range list {
-		// 立即进行标准化，防止后续处理遇到类型不一致问题
-		NormalizeNode(v)
-		list[i] = v
+	var res []map[string]any
+	for _, v := range list {
+		// 只有合法节点才会被加入最终结果
+		if NormalizeNode(v) {
+			res = append(res, v)
+		}
 	}
-	return list
+	return res
 }
 
 // ExtractV2RayLinks 正则提取逻辑
