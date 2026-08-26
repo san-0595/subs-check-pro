@@ -45,10 +45,13 @@ func (app *App) migrateConfig() error {
 	content := string(data)
 	needWrite := false
 
+	// 记录迁移类别
+	migrated := []string{}
+
 	var view migrateConfigView
 	_ = yaml.Unmarshal(data, &view)
 
-	// ① 自动升级 singbox-latest 到 1.14（支持 v1/v2）
+	// 自动升级 singbox-latest 到 1.14（支持 v1/v2）
 	if view.SingboxLatest.Version != "" {
 		latestVer := strings.TrimSpace(view.SingboxLatest.Version)
 		latestJSON := extractString(view.SingboxLatest.JSON)
@@ -65,7 +68,7 @@ func (app *App) migrateConfig() error {
 				(isOfficialJS && !(major == 1 && minor == 14))
 
 		if needUpgrade {
-			slog.Info("[配置迁移] 自动迁移 singbox-latest 配置到 1.14.x")
+			slog.Info("singbox-latest 配置迁移到 1.14.x")
 
 			newCfg := singBoxConfigV1{
 				Version: "1.14",
@@ -79,27 +82,30 @@ func (app *App) migrateConfig() error {
 
 			content = rewriteSingboxBlock(content, "singbox-latest", newCfg)
 			needWrite = true
+			migrated = append(migrated, "singbox")
 		}
 
 	}
 
-	// ② singbox-old：仅当版本 ≤ 1.11 才提示用户
+	// singbox-old：仅当版本 ≤ 1.11 才提示用户
 	if view.SingboxOld.Version != "" {
 		oldMajor, oldMinor := parseVersion(view.SingboxOld.Version)
 
 		// 用户主动填写 >1.11 的版本（例如 1.12），说明有需求 → 不提示
 		if oldMajor == 1 && oldMinor <= 11 {
-			slog.Info("singbox-old 版本 1.11 已从 App Store 下架")
-			slog.Info("sing-box MT 版本 1.14 于 2026-08-31 上架 App Store，建议尽快下载")
+			slog.Warn("singbox-old 版本 1.11 已从 App Store 下架")
+			slog.Info("sing-box MT 版本 1.14 已于 2026-8-31 上架 App Store")
+			slog.Info("建议尽快移除 sing-box 1.11 配置，使用新版本")
 		}
 	}
 
-	// ③ resolve-domain 布尔 → 新对象格式迁移（含注释）
+	// resolve-domain 布尔 → 新对象格式迁移（含注释）
 	// 这里用统一视图判断类型：bool = 旧格式；map = 新格式
 	switch v := view.SubProcess.ResolveDomain.(type) {
 	case bool:
 		content = rewriteResolveDomain(content, v)
 		needWrite = true
+		migrated = append(migrated, "resolve-domain")
 	case map[string]interface{}, map[interface{}]interface{}:
 		// 已是新对象格式，跳过
 	default:
@@ -109,9 +115,17 @@ func (app *App) migrateConfig() error {
 	// 写回文件
 	if needWrite {
 		if err := os.WriteFile(app.configPath, []byte(content), 0o644); err != nil {
+			slog.Error("配置文件迁移失败", "error", err)
 			return err
 		}
-		slog.Info("[配置迁移] 已自动迁移为新配置格式")
+		joined := ""
+		if len(migrated) == 1 {
+			joined = migrated[0]
+		} else if len(migrated) > 1 {
+			joined = strings.Join(migrated, ",")
+		}
+
+		slog.Info("配置文件迁移完成", "config", joined)
 	}
 
 	return nil

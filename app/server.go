@@ -143,7 +143,8 @@ func (app *App) initHTTPServer() error {
 	webUIURL := "http://localhost:" + strings.TrimPrefix(listenAddr, ":") + AdminPath
 
 	if config.GlobalConfig.EnableWebUI {
-		slog.Info("启用Web控制面板", "path", webUIURL, "api-key", config.GlobalConfig.APIKey)
+		slog.Info("启用Web管理界面", "path", webUIURL, "api-key", config.GlobalConfig.APIKey)
+		slog.Info("远程Web管理就绪", "info", "公网域名访问建议使用Cloudflare隧道映射")
 	} else {
 		slog.Info("HTTP 服务器启动", "port", strings.TrimPrefix(listenAddr, ":"))
 	}
