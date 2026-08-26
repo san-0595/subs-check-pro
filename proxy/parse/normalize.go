@@ -2,6 +2,7 @@ package parse
 
 import (
 	"fmt"
+	"github.com/goccy/go-json"
 	"log/slog"
 	"strconv"
 	"strings"
@@ -104,10 +105,10 @@ func NormalizeNode(m map[string]any) bool {
 	if t == "" || t == "invalid" {
 		return false
 	}
-	
+
 	server := strings.TrimSpace(fmt.Sprintf("%v", m["server"]))
 	port := ToIntPort(m["port"])
-	
+
 	// 豁免本地和特殊策略类型（direct, reject, dns 等）
 	if t != "direct" && t != "reject" && t != "dns" {
 		if server == "" || server == "<nil>" || port <= 0 || port > 65535 {
@@ -200,6 +201,12 @@ func ToIntPort(v any) int {
 		return int(val)
 	case float64:
 		return int(val)
+		// 很多 JSON 解析器开启 UseNumber 选项时会产生该类型
+	case json.Number:
+		if p, err := val.Int64(); err == nil {
+			return int(p)
+		}
+		return 0
 	// 字符串（如 "443" 或 "443.0"）
 	case string:
 		s := strings.TrimSpace(val)
@@ -211,18 +218,6 @@ func ToIntPort(v any) int {
 		}
 		return 0
 	default:
-		// 兜底：转字符串解析，并记录类型信息便于未来扩展
-		s := fmt.Sprintf("%v", v)
-		if i := strings.IndexByte(s, '.'); i > 0 {
-			s = s[:i]
-		}
-		if p, err := strconv.Atoi(strings.TrimSpace(s)); err == nil {
-			slog.Debug("ToIntPort: 兜底转换成功，建议添加显式 case",
-				"type", fmt.Sprintf("%T", v), "value", v)
-			return p
-		}
-		slog.Warn("ToIntPort: 无法转换端口，请检查数据来源",
-			"type", fmt.Sprintf("%T", v), "value", v)
 		return 0
 	}
 }
