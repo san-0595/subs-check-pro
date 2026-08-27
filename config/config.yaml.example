@@ -408,6 +408,8 @@ system-proxy: ""
 github-proxy: ""
 # GitHub 代理列表：程序会自动筛选可用的 GitHub 代理
 ghproxy-group:
+  - https://githubdog.com/
+  - https://axisnow.gh-proxy.org/
   - https://q-github.cnxiaobai.com/
   - https://gh.wglee.org/
   - https://hk.gh-proxy.org/
