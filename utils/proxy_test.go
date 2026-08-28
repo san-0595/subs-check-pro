@@ -23,7 +23,7 @@ func TestIsDirectProxyConfig(t *testing.T) {
 	}{
 		{name: "direct", input: "direct", want: true},
 		{name: "mixed case", input: " Direct ", want: true},
-		{name: "proxy url", input: "http://127.0.0.1:7890", want: false},
+		{name: "proxy url", input: "http://127.0.0.1:10808", want: false},
 		{name: "empty", input: "", want: false},
 	}
 
@@ -206,6 +206,7 @@ func deduplicateStrings(ss []string) []string {
 
 // GitHub 代理列表
 var GhProxies = []string{
+	"https://gh-proxy.com",
 	"gh-proxy.org",
 	"cdn.gh-proxy.org",
 	"axisnow.gh-proxy.org",
