@@ -49,6 +49,22 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Detect release type
+        id: release_type
+        run: |
+          if [[ "${GITHUB_REF_NAME}" == *"-beta"* || "${GITHUB_REF_NAME}" == *"-rc"* ]]; then
+            echo "type=pre" >> $GITHUB_OUTPUT
+          else
+            echo "type=stable" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Find previous stable tag
+        id: prev_tag
+        if: steps.release_type.outputs.type == 'stable'
+        run: |
+          prev=$(git tag --list "v[0-9]*" --sort=-creatordate | grep -v '\-beta' | grep -v '\-rc' | grep -v "${GITHUB_REF_NAME}" | head -n1)
+          echo "tag=$prev" >> $GITHUB_OUTPUT
+
       - name: Delete existing release
         run: |
           gh release view ${{ github.ref_name }} &>/dev/null && \
@@ -57,11 +73,13 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       # 自动发布到 GitHub Releases 和 Docker Hub，使用 .goreleaser.yaml 中的配置
+      # 正式版发布时忽略两个正式版中间的预览版标签
       - name: Create GitHub release and Docker images
         uses: goreleaser/goreleaser-action@v7
         with:
           version: latest
-          args: release --clean
+          args: |
+            release --clean $([[ "${{ steps.release_type.outputs.type }}" == "stable" ]] && echo "--previous-tag ${{ steps.prev_tag.outputs.tag }}")
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}

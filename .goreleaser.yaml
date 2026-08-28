@@ -106,6 +106,7 @@ archives:
 # Docker 镜像多架构自动打包与分发
 dockers_v2:
   - id: subs-check-pro
+    # 使用专用 Dockerfile 文件
     dockerfile: Dockerfile.goreleaser
     # 同时发布到 GitHub Container Registry 和 Docker Hub
     images:
