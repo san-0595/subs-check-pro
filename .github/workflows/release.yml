@@ -81,11 +81,11 @@ jobs:
         uses: goreleaser/goreleaser-action@v7
         with:
           version: latest
-          args: |
-            release --clean $([[ "${{ steps.release_type.outputs.type }}" == "stable" ]] && echo "--previous-tag ${{ steps.prev_tag.outputs.tag }}")
+          args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          GORELEASER_PREVIOUS_TAG: ${{ steps.release_type.outputs.type == 'stable' && steps.prev_tag.outputs.tag || '' }}
 
   notify:
     if: github.ref != 'refs/heads/v2'
