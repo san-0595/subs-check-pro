@@ -47,13 +47,13 @@ func init() {
 
 	// 创建两个单独的handler
 	// 1. 终端输出 - 带颜色
-	consoleHandler := tint.NewHandler(getStdout(), &tint.Options{
+	consoleHandler := tint.NewTextHandler(getStdout(), &tint.Options{
 		Level:      logLevel,
 		TimeFormat: "01-02 15:04:05",
 	})
 
 	// 2. 文件输出 - 不带颜色
-	fileHandler := tint.NewHandler(fileLogger, &tint.Options{
+	fileHandler := tint.NewTextHandler(fileLogger, &tint.Options{
 		Level:      logLevel,
 		TimeFormat: "01-02 15:04:05",
 		NoColor:    true, // 禁用颜色
