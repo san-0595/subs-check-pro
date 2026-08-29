@@ -52,7 +52,7 @@ jobs:
       - name: Detect release type
         id: release_type
         run: |
-          if [[ "${GITHUB_REF_NAME}" == *"-beta"* || "${GITHUB_REF_NAME}" == *"-rc"* ]]; then
+          if [[ "${GITHUB_REF_NAME}" =~ -(alpha|beta|rc|preview|nightly) ]]; then
             echo "type=pre" >> $GITHUB_OUTPUT
           else
             echo "type=stable" >> $GITHUB_OUTPUT
@@ -62,7 +62,10 @@ jobs:
         id: prev_tag
         if: steps.release_type.outputs.type == 'stable'
         run: |
-          prev=$(git tag --list "v[0-9]*" --sort=-creatordate | grep -v '\-beta' | grep -v '\-rc' | grep -v "${GITHUB_REF_NAME}" | head -n1)
+          prev=$(git tag --list "v[0-9]*" --sort=-creatordate \
+            | grep -Ev '\-(alpha|beta|rc|preview|nightly)' \
+            | grep -v "${GITHUB_REF_NAME}" \
+            | head -n1)
           echo "tag=$prev" >> $GITHUB_OUTPUT
 
       - name: Delete existing release
