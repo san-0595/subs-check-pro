@@ -34,6 +34,7 @@ type subStorePaths struct {
 	nodePath                          string
 	jsPath                            string
 	frontDir                          string
+	subInfoJSPath                     string
 	overYamlACL4SSRPath               string
 	overYamlSinspiredRulesCDNPath     string
 	overYamlSinspiredRulesLiteCDNPath string
@@ -64,6 +65,7 @@ func getSubStorePaths() (*subStorePaths, error) {
 		jsPath:                            filepath.Join(substoreDir, "sub-store.bundle.js"),
 		frontDir:                          filepath.Join(substoreDir, "frontend"),
 		overYamlACL4SSRPath:               filepath.Join(saver.OutputPath, "ACL4SSR_Online_Full.yaml"),
+		subInfoJSPath:                     filepath.Join(saver.OutputPath, "sub-info.js"),
 		overYamlSinspiredRulesCDNPath:     filepath.Join(saver.OutputPath, "Sinspired_Rules_CDN.yaml"),
 		overYamlSinspiredRulesLiteCDNPath: filepath.Join(saver.OutputPath, "Sinspired_Rules_Lite_CDN.yaml"),
 		logPath:                           filepath.Join(substoreDir, "sub-store.log"),
@@ -194,6 +196,7 @@ func startSubStore(ctx context.Context) error {
 	// TODO: 自动在线更新，不再删除
 	_ = os.Remove(paths.nodePath)
 	_ = os.Remove(paths.jsPath)
+	_ = os.Remove(paths.subInfoJSPath)
 	_ = os.Remove(paths.overYamlACL4SSRPath)
 	_ = os.Remove(paths.overYamlSinspiredRulesCDNPath)
 	_ = os.RemoveAll(paths.frontDir)
@@ -491,6 +494,11 @@ func extractAssets(paths *subStorePaths) error {
 	// 展开 sub-store 前端资源目录
 	if err := extractFrontendFS(EmbeddedSubStoreFrontend, paths.frontDir); err != nil {
 		return fmt.Errorf("展开前端资源失败: %w", err)
+	}
+
+	// 写出 sub-info 订阅信息节点脚本
+	if err := writeEmbeddedFile(EmbeddedSubInfoJS, paths.subInfoJSPath, 0o644, "sub-store 脚本"); err != nil {
+		return err
 	}
 
 	// 写出 ACL4SSR_Online_Full.yaml

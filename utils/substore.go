@@ -121,7 +121,7 @@ function operator(proxies = []) {
 	subInfoURLKeyword = "sub-store-scripts"
 
 	// defaultSubInfoURL 首次注入时使用的默认脚本地址
-	defaultSubInfoURL = "https://raw.githubusercontent.com/sinspired/sub-store-scripts/refs/heads/main/surge/modules/sub-store-scripts/sub-info/node.js#showLastUpdate=true"
+	defaultSubInfoURL = "http://127.0.0.1:8199/sub-info.js#showLastUpdate=true"
 )
 
 // 全局锁防止 save 包并发推送和前端修改并发写冲突

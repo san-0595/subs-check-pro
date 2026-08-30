@@ -10,6 +10,9 @@ var EmbeddedSubStoreBackend []byte
 //go:embed frontend
 var EmbeddedSubStoreFrontend embed.FS
 
+//go:embed sub-info.js
+var EmbeddedSubInfoJS []byte
+
 //go:embed ACL4SSR_Online_Full.yaml
 var EmbeddedOverrideYamlACL4SSR []byte
 
