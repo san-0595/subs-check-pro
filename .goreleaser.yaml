@@ -67,7 +67,6 @@ builds:
   - id: subs-check-pro
     env:
       - CGO_ENABLED=0
-      - GOEXPERIMENT=jsonv2
     targets:
       # Desktop / Server
       - linux_amd64
