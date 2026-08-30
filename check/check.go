@@ -1429,8 +1429,7 @@ func isRetryable(err error) bool {
 	if errors.Is(err, context.DeadlineExceeded) {
 		return true
 	}
-	var netErr net.Error
-	if errors.As(err, &netErr) {
+	if netErr, ok := errors.AsType[net.Error](err); ok {
 		// Timeout() 涵盖 i/o timeout、TLS handshake timeout 等
 		return netErr.Timeout()
 	}

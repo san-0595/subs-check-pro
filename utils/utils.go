@@ -109,7 +109,8 @@ func JoinURL(parts ...string) string {
 		if p == "" {
 			continue
 		}
-		out.WriteString("/");out.WriteString(strings.Trim(p, "/"))
+		out.WriteString("/")
+		out.WriteString(strings.Trim(p, "/"))
 	}
 
 	return out.String()

@@ -13,9 +13,9 @@ import (
 
 // v1/v2 统一视图：json/js 可能是字符串，也可能是列表
 type singBoxConfigUnified struct {
-	Version string      `yaml:"version"`
-	JSON    interface{} `yaml:"json"`
-	JS      interface{} `yaml:"js"`
+	Version string `yaml:"version"`
+	JSON    any    `yaml:"json"`
+	JS      any    `yaml:"js"`
 }
 
 // 仅解析迁移相关字段
@@ -24,7 +24,7 @@ type migrateConfigView struct {
 	SingboxOld    singBoxConfigUnified `yaml:"singbox-old"`
 
 	SubProcess struct {
-		ResolveDomain interface{} `yaml:"resolve-domain"`
+		ResolveDomain any `yaml:"resolve-domain"`
 	} `yaml:"sub-process"`
 }
 
@@ -106,7 +106,7 @@ func (app *App) migrateConfig() error {
 		content = rewriteResolveDomain(content, v)
 		needWrite = true
 		migrated = append(migrated, "resolve-domain")
-	case map[string]interface{}, map[interface{}]interface{}:
+	case map[string]any, map[any]any:
 		// 已是新对象格式，跳过
 	default:
 		// 不存在或其他类型，跳过
@@ -167,11 +167,11 @@ func versionLess(raw string, targetMajor, targetMinor int) bool {
 }
 
 // 提取字符串或列表的第一个元素
-func extractString(v interface{}) string {
+func extractString(v any) string {
 	switch val := v.(type) {
 	case string:
 		return val
-	case []interface{}:
+	case []any:
 		if len(val) > 0 {
 			if s, ok := val[0].(string); ok {
 				return s
