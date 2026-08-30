@@ -852,13 +852,33 @@ func UpdateSubStore(yamlData []byte) {
 	UpdateSubStorePartial(yamlData, true, true, true, true)
 }
 
+// 判断是否需要做耗时的 GetGhProxy 探活
+func needGhProxy(doMihomo, doSbLatest, doSbOld bool) bool {
+	if doMihomo && !IsLocalURL(config.GlobalConfig.MihomoOverwriteURL) {
+		return true
+	}
+	if doSbLatest {
+		if !IsLocalURL(config.GlobalConfig.SingboxLatest.JS) ||
+			!IsLocalURL(config.GlobalConfig.SingboxLatest.JSON) {
+			return true
+		}
+	}
+	if doSbOld {
+		if !IsLocalURL(config.GlobalConfig.SingboxOld.JS) ||
+			!IsLocalURL(config.GlobalConfig.SingboxOld.JSON) {
+			return true
+		}
+	}
+	return false
+}
+
 // UpdateSubStorePartial 按需精准更新指定的配置 (供 API 调用)
 func UpdateSubStorePartial(yamlData []byte, doSub, doMihomo, doSbLatest, doSbOld bool) {
 	subStoreMu.Lock()
 	defer subStoreMu.Unlock()
 
-	// 只有涉及到这三者才做耗时的 GetGhProxy 探活
-	if doMihomo || doSbLatest || doSbOld {
+	// 只有涉及到这几者才做耗时的 GetGhProxy 探活
+	if needGhProxy(doMihomo, doSbLatest, doSbOld) {
 		IsGithubProxy = GetGhProxy()
 	}
 
