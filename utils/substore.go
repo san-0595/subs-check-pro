@@ -15,8 +15,8 @@ import (
 	"time"
 
 	"github.com/goccy/go-json"
-
 	"github.com/sinspired/subs-check-pro/v2/config"
+	"github.com/sinspired/subs-check-pro/v2/utils/script"
 )
 
 // Args 脚本操作参数
@@ -92,52 +92,9 @@ const (
 	// Deprecated: sing-box MT 于 2026-08-31 上架 App Store 后将逐步移除
 	OldSingboxJS = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.11.x/sing-box.js"
 
-	// subInfoURLKeyword 用于在 SCP 操作中识别订阅流量信息脚本
+	// subInfoURLKeyword 用于在 SCP 操作中识别旧版 link 模式下的订阅流量信息脚本
 	subInfoURLKeyword = "sub-store-scripts"
-
-	// nodeSplitScript 将 DNS 解析得到的多 IP 展开为独立节点
-	nodeSplitScript = `// 节点裂变脚本
-function operator(proxies = []) {
-  return proxies.flatMap((p = {}) => {
-    const ips = p._resolved_ips
-    if (!Array.isArray(ips) || ips.length === 0) return [p]
-
-    const expanded = ips.map((server, i) => ({
-      ...p,
-      name: ` + "`${p.name}|+${i + 1}`" + `,
-      server,
-    }))
-
-    if (p._domain) {
-      expanded.push({
-        ...p,
-        name: ` + "`${p.name}|已裂变`" + `,
-        server: p._domain,
-      })
-    }
-
-    return expanded
-  })
-}`
 )
-
-// getStaticIconURL 获取http服务的文件地址
-func getStaticIconURL(fileName string) string {
-	port := strings.TrimPrefix(strings.TrimSpace(config.GlobalConfig.ListenPort), ":")
-	if port == "" {
-		port = "8199" // 默认端口
-	}
-	return "http://127.0.0.1:" + port + "/static/icon/" + fileName
-}
-
-// getDefaultSubInfoURL 获取http服务的流量信息节点脚本地址
-func getDefaultSubInfoURL() string {
-	port := strings.TrimPrefix(strings.TrimSpace(config.GlobalConfig.ListenPort), ":")
-	if port == "" {
-		port = "8199" // 默认端口
-	}
-	return "http://127.0.0.1:" + port + "/sub-info.js#showLastUpdate=true"
-}
 
 // 全局锁防止 save 包并发推送和前端修改并发写冲突
 var subStoreMu sync.Mutex
@@ -220,16 +177,28 @@ func isQuickSettingOperator(raw json.RawMessage) bool {
 // 前提：已确认是 SCP 操作，此处再通过 type + content 二次确认。
 func isSubInfoScpOperator(raw json.RawMessage) bool {
 	var op struct {
-		Type string `json:"type"`
-		Args struct {
+		Type       string `json:"type"`
+		CustomName string `json:"customName"`
+		Args       struct {
 			Content string `json:"content"`
+			Mode    string `json:"mode"`
 		} `json:"args"`
 	}
 	if err := json.Unmarshal(raw, &op); err != nil {
 		return false
 	}
-	return op.Type == "Script Operator" &&
-		strings.Contains(op.Args.Content, subInfoURLKeyword)
+	if op.Type != "Script Operator" {
+		return false
+	}
+	// 兼容旧版 link 模式
+	if op.Args.Mode == "link" && strings.Contains(op.Args.Content, subInfoURLKeyword) {
+		return true
+	}
+	// 新版 script 模式：通过 CustomName 快速匹配（因为外层已确认是 scpIDPrefix）
+	if op.Args.Mode == "script" && op.CustomName == "注入订阅流量信息节点" {
+		return true
+	}
+	return false
 }
 
 // patchDisabled 仅修改操作的 disabled 字段，其余字段原样保留
@@ -297,7 +266,7 @@ func buildScpOps(cfg config.SubProcessConfig) []any {
 			CustomName: "节点裂变",
 			ID:         newOperatorID(),
 			Args: Args{
-				"content": nodeSplitScript,
+				"content": string(script.EmbeddedNodeSplitScript),
 				"mode":    "script",
 			},
 		})
@@ -427,8 +396,8 @@ func mergeSubProcess(existing []json.RawMessage, scpOps []any, cfg config.SubPro
 			CustomName: "注入订阅流量信息节点",
 			ID:         newOperatorID(), // 带 SCP ID，下次由 isSubInfoScpOperator 识别保留
 			Args: Args{
-				"content": WarpURL(getDefaultSubInfoURL(), IsGithubProxy),
-				"mode":    "link",
+				"content": string(script.EmbeddedSubInfoJS),
+				"mode":    "script",
 				"arguments": Args{
 					"showLastUpdate": "true",
 				},
@@ -452,47 +421,22 @@ func rebuildSubInfoContent(raw json.RawMessage) (any, error) {
 		return nil, err
 	}
 
-	content, _ := op.Args["content"].(string)
-
-	// 剥离旧代理前缀，还原原始 URL（stripGhProxy 保留 #fragment）
-	bare := stripGhProxy(content)
-
-	// 分离 base 与 fragment，fragment 原样保留
-	base, fragment, hasFragment := strings.Cut(bare, "#")
-
-	newContent := WarpURL(base, IsGithubProxy)
-	if hasFragment {
-		newContent += "#" + fragment
+	if op.Args == nil {
+		op.Args = make(map[string]any)
 	}
-	op.Args["content"] = newContent
 
-	return op, nil
-}
+	// 强制覆盖更新内容为当前程序编译进的脚本
+	op.Args["mode"] = "script"
+	op.Args["content"] = string(script.EmbeddedSubInfoJS)
 
-// stripGhProxy 剥离 GitHub 代理前缀，还原为原始 URL
-// 支持两种格式：
-//   - https://proxy.domain/https://raw.githubusercontent.com/...  （前缀拼接完整 URL）
-//   - https://proxy.domain/raw.githubusercontent.com/...          （省略 https:// 的短格式）
-func stripGhProxy(rawURL string) string {
-	// 常见 GitHub 原始地址特征
-	markers := []string{
-		"https://raw.githubusercontent.com",
-		"https://github.com",
-		"raw.githubusercontent.com",
-		"github.com",
-	}
-	for _, marker := range markers {
-		idx := strings.Index(rawURL, marker)
-		if idx > 0 {
-			candidate := rawURL[idx:]
-			// 短格式：raw.githubusercontent.com 没有 https://，补上
-			if !strings.HasPrefix(candidate, "https://") {
-				candidate = "https://" + candidate
-			}
-			return candidate
+	// 保留或者初始化用户的自定义 arguments
+	if _, ok := op.Args["arguments"]; !ok {
+		op.Args["arguments"] = map[string]any{
+			"showLastUpdate": "true",
 		}
 	}
-	return rawURL
+
+	return op, nil
 }
 
 // canonicalURL 剥离当前配置的 Github Proxy 前缀，再规范化为 raw.githubusercontent.com 直链。
@@ -604,7 +548,7 @@ func mergeFileProcess(existing []json.RawMessage, scpOps []any) ([]any, error) {
 // 资源构建
 
 func newDefaultSub(data []byte) sub {
-	icon := getStaticIconURL("subs-check-pro.svg")
+	icon := "/scp/subs-check-pro.svg"
 	return sub{
 		Name:           SubName,
 		DisplayName:    SubName,
@@ -664,8 +608,7 @@ func newSingboxFile(name, jsURL, jsonURL string) file {
 		remark = "默认 Sing-Box-" + version + " 订阅 (带分流规则)"
 	}
 
-	// icon := "https://singbox.app/wp-content/uploads/2025/06/cropped-logo-278x300.webp"
-	icon := getStaticIconURL("sing-box.svg")
+	icon := "/scp/sing-box.svg"
 	return file{
 		Name:        name,
 		Remark:      remark,
