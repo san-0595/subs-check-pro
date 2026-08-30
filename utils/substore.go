@@ -92,6 +92,9 @@ const (
 	// Deprecated: sing-box MT 于 2026-08-31 上架 App Store 后将逐步移除
 	OldSingboxJS = "https://raw.githubusercontent.com/sinspired/sub-store-template/main/1.11.x/sing-box.js"
 
+	// subInfoURLKeyword 用于在 SCP 操作中识别订阅流量信息脚本
+	subInfoURLKeyword = "sub-store-scripts"
+
 	// nodeSplitScript 将 DNS 解析得到的多 IP 展开为独立节点
 	nodeSplitScript = `// 节点裂变脚本
 function operator(proxies = []) {
@@ -116,13 +119,25 @@ function operator(proxies = []) {
     return expanded
   })
 }`
-
-	// subInfoURLKeyword 用于在 SCP 操作中识别订阅流量信息脚本
-	subInfoURLKeyword = "sub-store-scripts"
-
-	// defaultSubInfoURL 首次注入时使用的默认脚本地址
-	defaultSubInfoURL = "http://127.0.0.1:8199/sub-info.js#showLastUpdate=true"
 )
+
+// getStaticIconURL 获取http服务的文件地址
+func getStaticIconURL(fileName string) string {
+	port := strings.TrimPrefix(strings.TrimSpace(config.GlobalConfig.ListenPort), ":")
+	if port == "" {
+		port = "8199" // 默认端口
+	}
+	return "http://127.0.0.1:" + port + "/static/icon/" + fileName
+}
+
+// getDefaultSubInfoURL 获取http服务的流量信息节点脚本地址
+func getDefaultSubInfoURL() string {
+	port := strings.TrimPrefix(strings.TrimSpace(config.GlobalConfig.ListenPort), ":")
+	if port == "" {
+		port = "8199" // 默认端口
+	}
+	return "http://127.0.0.1:" + port + "/sub-info.js#showLastUpdate=true"
+}
 
 // 全局锁防止 save 包并发推送和前端修改并发写冲突
 var subStoreMu sync.Mutex
@@ -412,7 +427,7 @@ func mergeSubProcess(existing []json.RawMessage, scpOps []any, cfg config.SubPro
 			CustomName: "注入订阅流量信息节点",
 			ID:         newOperatorID(), // 带 SCP ID，下次由 isSubInfoScpOperator 识别保留
 			Args: Args{
-				"content": WarpURL(defaultSubInfoURL, IsGithubProxy),
+				"content": WarpURL(getDefaultSubInfoURL(), IsGithubProxy),
 				"mode":    "link",
 				"arguments": Args{
 					"showLastUpdate": "true",
@@ -589,7 +604,7 @@ func mergeFileProcess(existing []json.RawMessage, scpOps []any) ([]any, error) {
 // 资源构建
 
 func newDefaultSub(data []byte) sub {
-	icon := WarpURL("https://raw.githubusercontent.com/sinspired/subs-check-pro-webui/main/webui/static/icon/favicon.svg", IsGithubProxy)
+	icon := getStaticIconURL("subs-check-pro.svg")
 	return sub{
 		Name:           SubName,
 		DisplayName:    SubName,
@@ -650,7 +665,7 @@ func newSingboxFile(name, jsURL, jsonURL string) file {
 	}
 
 	// icon := "https://singbox.app/wp-content/uploads/2025/06/cropped-logo-278x300.webp"
-	icon := WarpURL("https://raw.githubusercontent.com/sinspired/subs-check-pro-webui/main/webui/static/icon/singbox.svg", IsGithubProxy)
+	icon := getStaticIconURL("sing-box.svg")
 	return file{
 		Name:        name,
 		Remark:      remark,
@@ -853,7 +868,7 @@ func UpdateSubStore(yamlData []byte) {
 }
 
 // 判断是否需要做耗时的 GetGhProxy 探活
-func needGhProxy(doMihomo, doSbLatest, doSbOld bool) bool {
+func needGhProxy(doSub, doMihomo, doSbLatest, doSbOld bool) bool {
 	if doMihomo && !IsLocalURL(config.GlobalConfig.MihomoOverwriteURL) {
 		return true
 	}
@@ -878,7 +893,7 @@ func UpdateSubStorePartial(yamlData []byte, doSub, doMihomo, doSbLatest, doSbOld
 	defer subStoreMu.Unlock()
 
 	// 只有涉及到这几者才做耗时的 GetGhProxy 探活
-	if needGhProxy(doMihomo, doSbLatest, doSbOld) {
+	if needGhProxy(doSub, doMihomo, doSbLatest, doSbOld) {
 		IsGithubProxy = GetGhProxy()
 	}
 
