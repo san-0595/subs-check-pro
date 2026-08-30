@@ -895,7 +895,7 @@ func mediaCheck(job *ProxyJob, db *maxminddb.Reader, ctx context.Context) {
 	}
 
 	mediaClient := &http.Client{
-		Transport: job.Client.Client.Transport,
+		Transport: job.Client.Transport,
 		Timeout:   time.Duration(mediaTimeout) * time.Second,
 	}
 
@@ -1156,8 +1156,8 @@ func (pc *ProxyChecker) updateProxyName(res *Result, httpClient *ProxyClient, sp
 			}
 		case "youtube":
 			yt := res.Youtube
-			switch {
-			case yt == "":
+			switch yt {
+			case "":
 				// 不可达或封锁，无标签
 			default:
 				// 分离地区和 Premium 标记
@@ -1348,7 +1348,9 @@ func (pc *ProxyClient) Close() {
 
 	// 关闭mihomo代理实例
 	if pc.mProxy != nil {
-		pc.mProxy.Close()
+		if err := pc.mProxy.Close(); err != nil {
+			slog.Error("关闭代理实例失败", "err", err)
+		}
 	}
 
 	// 关闭 HTTP 连接池

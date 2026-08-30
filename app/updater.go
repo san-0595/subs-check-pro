@@ -127,9 +127,9 @@ func (app *App) updateSuccess(current string, latest string, silentUpdate bool) 
 
 	// 发送更新成功通知
 	utils.SendNotifySelfUpdate(current, latest)
-	if err := restartSelf(silentUpdate); err != nil {
-		slog.Error("重启失败", "err", err)
-	}
+
+	// 重启应用
+	restartSelf(silentUpdate)
 }
 
 // restartSelf 跨平台自启

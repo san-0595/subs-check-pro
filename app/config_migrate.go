@@ -64,8 +64,8 @@ func (app *App) migrateConfig() error {
 
 		needUpgrade :=
 			versionLess(latestVer, 1, 14) ||
-				(isOfficialJSON && !(major == 1 && minor == 14)) ||
-				(isOfficialJS && !(major == 1 && minor == 14))
+				(isOfficialJSON && (major != 1 || minor != 14)) ||
+				(isOfficialJS && (major != 1 || minor != 14))
 
 		if needUpgrade {
 			slog.Info("singbox-latest 配置迁移到 1.14.x")
