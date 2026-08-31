@@ -498,11 +498,6 @@ func extractAssets(paths *subStorePaths) error {
 		return fmt.Errorf("展开前端资源失败: %w", err)
 	}
 
-	// 【重构与错误纠正】：
-	// 1. 使用数组循环减少大量啰嗦、重复的 if 判断，结构更加清晰
-	// 2. 原代码在此处错误使用了 EmbeddedSubInfoJS 来强行写入 Logo 图像内容，
-	//    此代码已经更改为你应有正确的资源变量名 (EmbeddedSubsCheckProLogo, EmbeddedSingBoxLogo)
-	//    注意：如果你原先并没有声明这两个变量，请在同级 `embed` 文件中声明它们，或是将其改回以适配你的变量！
 	assets := []embeddedAsset{
 		{EmbeddedSubStoreBackend, paths.jsPath, "sub-store 核心脚本"},
 		{EmbeddedSubsCheckProLogo, paths.subsCheckProLogoPath, "subs-check-pro svg logo"},

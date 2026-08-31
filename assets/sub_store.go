@@ -10,7 +10,7 @@ var EmbeddedSubStoreBackend []byte
 //go:embed frontend
 var EmbeddedSubStoreFrontend embed.FS
 
-//go:embed subs-check-pro.svg
+//go:embed scp-logo.svg
 var EmbeddedSubsCheckProLogo  []byte
 
 //go:embed sing-box.svg
