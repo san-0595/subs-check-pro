@@ -266,8 +266,9 @@ func buildScpOps(cfg config.SubProcessConfig) []any {
 			CustomName: "节点裂变",
 			ID:         newOperatorID(),
 			Args: Args{
-				"content": string(script.EmbeddedNodeSplitScript),
-				"mode":    "script",
+				"content":        string(script.EmbeddedNodeSplitScript),
+				"mode":           "script",
+				"editorLanguage": "javascript",
 			},
 		})
 	}
@@ -396,8 +397,9 @@ func mergeSubProcess(existing []json.RawMessage, scpOps []any, cfg config.SubPro
 			CustomName: "注入订阅流量信息节点",
 			ID:         newOperatorID(), // 带 SCP ID，下次由 isSubInfoScpOperator 识别保留
 			Args: Args{
-				"content": string(script.EmbeddedSubInfoJS),
-				"mode":    "script",
+				"content":        string(script.EmbeddedSubInfoJS),
+				"mode":           "script",
+				"editorLanguage": "javascript",
 				"arguments": Args{
 					"showLastUpdate": "true",
 				},
@@ -425,9 +427,19 @@ func rebuildSubInfoContent(raw json.RawMessage) (any, error) {
 		op.Args = make(map[string]any)
 	}
 
-	// 强制覆盖更新内容为当前程序编译进的脚本
+	// 提取当前模式和内容
+	mode, _ := op.Args["mode"].(string)
+	content, _ := op.Args["content"].(string)
+
+	// 如果还是旧版的 link 模式，但 URL 中已经找不到预设关键词，
+	// 说明用户自己魔改了 URL。此时我们尊重用户操作，原样返回，不进行覆盖。
+	if mode == "link" && !strings.Contains(content, subInfoURLKeyword) {
+		return op, nil
+	}
+	// 否则强制覆盖更新内容为当前程序编译进的最新的内置脚本
 	op.Args["mode"] = "script"
 	op.Args["content"] = string(script.EmbeddedSubInfoJS)
+	op.Args["editorLanguage"] = "javascript"
 
 	// 保留或者初始化用户的自定义 arguments
 	if _, ok := op.Args["arguments"]; !ok {
