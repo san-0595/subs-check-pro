@@ -53,9 +53,10 @@ var publicStaticFileList = []struct {
 	Route string // HTTP 路由路径
 	File  string // 对应文件名
 }{
+	{"/Shadowrocket-Rules-CDN.conf", "Shadowrocket-Rules-CDN.conf"},
 	{"/ACL4SSR_Online_Full.yaml", "ACL4SSR_Online_Full.yaml"},
-	{"/Sinspired_Rules_CDN.yaml", "Sinspired_Rules_CDN.yaml"},
-	{"/Sinspired_Rules_Lite_CDN.yaml", "Sinspired_Rules_Lite_CDN.yaml"},
+	{"/Mihomo-Rules-CDN.yaml", "Mihomo-Rules-CDN.yaml"},
+	{"/Mihomo-Rules-Lite-CDN.yaml", "Mihomo-Rules-Lite-CDN.yaml"},
 	{"/bdg.yaml", "bdg.yaml"},
 }
 
