@@ -314,6 +314,7 @@ func (app *App) registerAPIRoutes(router *gin.Engine) {
 		api.GET("/version", app.getVersion)
 		api.GET("/singbox-versions", app.getSingboxVersions)
 		api.GET("/logs", app.getLogs)
+		api.POST("/logs/clear", app.clearLogsHandler)
 		api.GET("/analysis-report", app.getAnalysisReport)
 		api.POST("/proxy/check", app.proxyCheckHandler)
 		api.POST("/notify/test", app.notifyTestHandler)
@@ -736,4 +737,24 @@ func (app *App) notifyTestHandler(c *gin.Context) {
 		}
 	}
 	c.JSON(http.StatusOK, gin.H{"ok": allOK, "results": results})
+}
+
+func (app *App) clearLogsHandler(c *gin.Context) {
+	logPath := TempLog()
+
+	// 清空日志内容
+	if err := os.Truncate(logPath, 0); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "清理失败：" + err.Error(),
+		})
+		return
+	}
+
+	// 截断文件后，立刻写入一条新的警告日志
+	// 这样不仅在控制台有提示，前端也能立刻拉取到这一句作为“空状态”的占位
+	slog.Warn("日志内容已清空")
+
+	c.JSON(http.StatusOK, gin.H{
+		"message": "日志文件已清空",
+	})
 }
