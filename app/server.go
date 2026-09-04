@@ -6,6 +6,7 @@ import (
 	"crypto/subtle"
 	"fmt"
 	"html/template"
+	"io"
 	"io/fs"
 	"log/slog"
 	"mime"
@@ -501,14 +502,43 @@ func (app *App) forceCloseHandler(c *gin.Context) {
 func (app *App) getLogs(c *gin.Context) {
 	logPath := TempLog()
 	if _, err := os.Stat(logPath); os.IsNotExist(err) {
-		c.JSON(http.StatusOK, gin.H{"logs": []string{}})
+		c.JSON(http.StatusOK, gin.H{"logs": []string{"[暂无日志文件]"}})
 		return
 	}
+
 	lines, err := ReadLastNLines(logPath, MaxLogLines)
+
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "读取日志失败" + err.Error()})
+		// 自动清理损坏日志
+		slog.Warn("日志文件损坏，自动清理", "path", logPath, "error", err)
+
+		// 删除损坏日志
+		_ = os.Remove(logPath)
+
+		// 自动重建空日志文件（避免前端报错）
+		_ = os.WriteFile(logPath, []byte{}, 0644)
+
+		// 有部分内容 → 提示放在最后
+		if len(lines) > 0 {
+			lines = append(lines,
+				fmt.Sprintf("[日志部分损坏，已自动清理: %v]", err),
+			)
+			c.JSON(http.StatusOK, gin.H{"logs": lines})
+			return
+		}
+
+		// 完全不可读
+		c.JSON(http.StatusOK, gin.H{"logs": []string{
+			fmt.Sprintf("[日志文件损坏，已自动清理: %v]", err),
+		}})
 		return
 	}
+
+	if len(lines) == 0 {
+		c.JSON(http.StatusOK, gin.H{"logs": []string{"[日志为空]"}})
+		return
+	}
+
 	c.JSON(http.StatusOK, gin.H{"logs": lines})
 }
 
@@ -572,27 +602,51 @@ func ReadLastNLines(filePath string, n int) ([]string, error) {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
+	reader := bufio.NewReader(file)
+
+	const maxLineSize = 64 * 1024 // 64KB
 	ring := make([]string, n)
 	count := 0
+	var scanErr error
 
-	for scanner.Scan() {
-		ring[count%n] = scanner.Text()
-		count++
-	}
-	if err := scanner.Err(); err != nil {
-		return nil, err
+	for {
+		line, err := reader.ReadString('\n')
+
+		if len(line) > maxLineSize {
+			// 超长行：跳过，不加入 ring
+			scanErr = fmt.Errorf("bufio.Scanner: token too long")
+			// 丢弃这一行剩余部分（如果没有换行）
+			for err == nil && !strings.HasSuffix(line, "\n") {
+				line, err = reader.ReadString('\n')
+			}
+			continue
+		}
+
+		if len(line) > 0 {
+			ring[count%n] = strings.TrimRight(line, "\n")
+			count++
+		}
+
+		if err != nil {
+			if err != io.EOF {
+				scanErr = err
+			}
+			break
+		}
 	}
 
+	// 整理结果
+	var result []string
 	if count <= n {
-		return ring[:count], nil
+		result = ring[:count]
+	} else {
+		result = make([]string, n)
+		start := count % n
+		copy(result, ring[start:])
+		copy(result[n-start:], ring[:start])
 	}
 
-	result := make([]string, n)
-	start := count % n
-	copy(result, ring[start:])
-	copy(result[n-start:], ring[:start])
-	return result, nil
+	return result, scanErr
 }
 
 func loadHistoricalCheckRate() {
